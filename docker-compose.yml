@@ -1,0 +1,63 @@
+version: "3.8"
+services:
+  postgres:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+  create-topic:
+    build: ./kafka-topics
+    networks:
+      - app-network
+  primary-backend:
+    build: ./primary-backend
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgres://postgres:password@postgres:5432/postgres
+      JWT_SECRET: "123randompassword"
+    ports:
+      - "3000:3000"
+    networks:
+      - app-network
+
+  webhook:
+    build: ./webhook
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgres://postgres:password@postgres:5432/postgres
+    ports:
+      - "3002:3002"
+    networks:
+      - app-network
+
+  worker:
+    build: ./worker
+    depends_on:
+      - create-topic
+    networks:
+      - app-network
+
+  processor:
+    build: ./processor
+    depends_on:
+      - postgres
+      - create-topic
+    environment:
+      DATABASE_URL: postgres://postgres:password@postgres:5432/postgres
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
